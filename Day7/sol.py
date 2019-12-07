@@ -20,7 +20,7 @@ def get_digit_right_to_left(number, digit_position):
 
 class IntcodeComputer():
     def __init__(self, program: List[int], phase_setting: int):
-        self.program = program
+        self.program = program[:]
         self.pointer = 0
         self.modes = 0
         self.inputs = [phase_setting]
@@ -131,33 +131,41 @@ class IntcodeCluster():
     def __init__(self,
                  program: List[int],
                  phase_setting: List[int],
+                 loop: bool = False,
                  input_signal: int = 0):
-        self.machines = [
-            IntcodeComputer(program[:], ps) for ps in phase_setting
-        ]
+        self.machines = [IntcodeComputer(program, ps) for ps in phase_setting]
         self.signal = input_signal
         self.counter = 0
+        self.loop = loop
 
-    def run_once(self):
+    def _run_once(self):
         for m in self.machines:
             self.signal = m.run_to_next_output(self.signal)
         return self.machines[4].output
 
-    def loop(self):
+    def _run_loop(self):
         while not self.machines[4].should_halt():
-            self.run_once()
+            self._run_once()
         return self.machines[4].output
 
+    def run(self):
+        return self._run_loop() if self.loop else self._run_once()
 
-phase_range = range(5, 10)
-phase_settings = list(itr.permutations(phase_range))
-max_output = 0
 
-program = input_list[:]
+class SignalMaximizer():
+    def __init__(self, loop: bool = False):
+        phase_range = range(5, 10) if loop else range(0, 5)
+        self.loop = loop
+        self.phase_settings = list(itr.permutations(phase_range))
+        self.max_output = 0
 
-for ps in phase_settings:
-    cluster = IntcodeCluster(program, ps)
-    output = cluster.loop()
-    max_output = max((max_output, output))
+    def maximize(self, program: List[int]):
+        for ps in self.phase_settings:
+            cluster = IntcodeCluster(program, ps, self.loop)
+            output = cluster.run()
+            self.max_output = max((self.max_output, output))
+        return self.max_output
 
-print(max_output)
+
+sigmax = SignalMaximizer(True)
+print(sigmax.maximize(input_list))
