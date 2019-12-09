@@ -167,5 +167,5 @@ class SignalMaximizer():
         return self.max_output
 
 
-sigmax = SignalMaximizer(True)
+sigmax = SignalMaximizer(False)
 print(sigmax.maximize(input_list))
