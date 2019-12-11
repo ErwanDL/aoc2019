@@ -71,7 +71,7 @@ class Asteroid():
         # if gcd is 1, no other asteroid can be on the line of sight : other is detected
         if gcd == 1:
             return True
-        # if gcd is > 1, we check if any position in the line of sight has an asteroid
+        # if gcd is > 1, we check if any position in the line of sight has an asteroid on it
         elem_diff_vector = div(diff_vector, gcd)
         for i in range(1, gcd):
             pos_to_search = add(self.position, mult(elem_diff_vector, i))
