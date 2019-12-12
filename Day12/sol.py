@@ -4,6 +4,8 @@ from typing import List, Tuple
 import numpy as np
 import re
 import math
+from multiprocessing import Process, Pool
+import time
 dirname = os.path.dirname(__file__)
 input_txt = open(dirname + "/input.txt", "r").read()
 
@@ -13,10 +15,11 @@ input_list = [tuple(map(int, coords)) for coords in txt_positions]
 
 
 def lcm(*args):
-    if len(args) == 2:
-        return abs(args[0] * args[1]) // math.gcd(args[0], args[1])
-    else:
-        return lcm(args[0], lcm(*args[1:]))
+    a = args[0]
+    if len(args) <= 1:
+        return a
+    b = lcm(*args[1:])
+    return abs(a * b) // math.gcd(a, b)
 
 
 class Moon:
@@ -83,26 +86,47 @@ class System:
     def get_vel_on_axis(self, axis: int) -> List[int]:
         return [m.vel[axis] for m in self.moons]
 
-    def get_cycle_length(self) -> int:
+    def get_cycle_length_on_axis(self, axis: int) -> int:
+        min_cycle = 0
+        counter = 0
+        while not min_cycle:
+            self.one_step_sim()
+            counter += 1
+            if (self.get_pos_on_axis(axis) == list(self.initial_pos[:, axis])
+                    and self.get_vel_on_axis(axis) == [0, 0, 0, 0]):
+                min_cycle = counter
+        return min_cycle
+
+    def get_cycle_length_multiprocess(self) -> int:
+        p = Pool(processes=3)
+        cycle_lengths = p.starmap(System.get_cycle_length_on_axis,
+                                  [(self, i) for i in range(3)])
+        p.close()
+        return lcm(*cycle_lengths)
+
+    def get_cycle_length_monoprocess(self) -> int:
         # min_cycle[0] will contain the minimum number of steps for the problem
         # to get back to its initial state on the X axis ; min_cycle[1] for the
         # Y axis ; min_cycle[2] for the Z axis
-        min_cycle = [0, 0, 0]
+        min_cycles = [0, 0, 0]
         counter = 0
 
-        while not (min_cycle[0] and min_cycle[1] and min_cycle[2]):
+        while not (min_cycles[0] and min_cycles[1] and min_cycles[2]):
             counter += 1
-            syst.one_step_sim()
+            self.one_step_sim()
             for i in range(3):
                 # checking (if not found yet) if the system on the i-th axis
                 # has come back to its initial state
-                if not min_cycle[i] and (
-                        syst.get_pos_on_axis(i) == list(syst.initial_pos[:, i])
-                        and syst.get_vel_on_axis(i) == [0, 0, 0, 0]):
-                    min_cycle[i] = counter
+                if not min_cycles[i] and (
+                        self.get_pos_on_axis(i) == list(self.initial_pos[:, i])
+                        and self.get_vel_on_axis(i) == [0, 0, 0, 0]):
+                    min_cycles[i] = counter
 
-        return lcm(*min_cycle)
+        return lcm(*min_cycles)
 
 
-syst = System(input_list)
-print(syst.get_cycle_length())
+if __name__ == '__main__':
+    syst = System(input_list)
+    tic = time.time()
+    print(syst.get_cycle_length_multiprocess())
+    print(time.time() - tic)
