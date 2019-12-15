@@ -3,8 +3,9 @@ dirname = os.path.dirname(__file__)
 input_txt = open(dirname + "/input.txt", "r").read()
 input_list = list(map(int, input_txt.split(",")))
 
-from typing import List
+from typing import List, Tuple, Dict, Callable
 from collections import defaultdict
+import numpy as np
 
 
 def get_digit_right_to_left(number, digit_position):
@@ -23,7 +24,7 @@ class EndOfProgram(Exception):
 
 
 class IntcodeComputer:
-    def __init__(self, program: List[int]):
+    def __init__(self, program: List[int], input_callback: Callable):
         dict_program = {k: v for k, v in enumerate(program)}
         # storing the program using a defaultdict for easy auto-expansion
         self.program = defaultdict(lambda: 0, dict_program)
@@ -31,7 +32,7 @@ class IntcodeComputer:
         self.modes = 0
         self.relative_base = 0
         self.halt = False
-        self.input = None
+        self.input_callback = input_callback
         self.output = None
         self.new_output = False
 
@@ -63,9 +64,7 @@ class IntcodeComputer:
         self.pointer += 4
 
     def op_input(self) -> None:
-        value = self.input
-
-        self.program[self.param(1)] = value
+        self.program[self.param(1)] = self.input_callback()
         self.pointer += 2
 
     def op_output(self) -> None:
@@ -131,8 +130,7 @@ class IntcodeComputer:
             self.parse_next_instruction()
         return self.output
 
-    def run_to_next_output(self, new_input: int = None) -> int:
-        self.input = new_input
+    def run_to_next_output(self) -> int:
         while not (self.halt or self.new_output):
             self.parse_next_instruction()
         if self.halt:
@@ -142,29 +140,73 @@ class IntcodeComputer:
 
 
 class ArcadeCabinet:
-    def get_next_tile(self) -> List[int]:
-        return [self.cpt.run_to_next_output() for i in range(3)]
-
-    def draw_grid(self) -> None:
-        while True:
-            try:
-                tile = self.get_next_tile()
-                self.grid[tile[0], tile[1]] = tile[2]
-            except EndOfProgram:
-                break
+    def get_auto_joystick_input(self) -> int:
+        if self.ball_pos[0] > self.paddle_pos[0]:
+            return 1
+        if self.ball_pos[0] < self.paddle_pos[0]:
+            return -1
+        return 0
 
     def __init__(self, program: List[int]):
-        self.cpt = IntcodeComputer(program)
-        #self.cpt.program[0] = 2
-        self.grid = {}
-        self.draw_grid()
+        self.cpt = IntcodeComputer(program, self.get_auto_joystick_input)
+        self.cpt.program[0] = 2
+        self.grid: Dict[Tuple[int, int], int] = {}
+        self.score = 0
+        self.paddle_pos: Tuple[int, int] = (0, 0)
+        self.ball_pos: Tuple[int, int] = (0, 0)
+
+    def get_next_triplet(self) -> List[int]:
+        return [self.cpt.run_to_next_output() for i in range(3)]
+
+    def parse_triplet(self, triplet: List[int]) -> bool:
+        """
+            Returns False if the triplet is a score indicator, or True if the
+            triplet is a tile.
+        """
+        pos = tuple(triplet[:2])
+        if pos == (-1, 0):
+            self.score = triplet[2]
+            return False
+        if triplet[2] == 3:
+            self.paddle_pos = pos
+        elif triplet[2] == 4:
+            self.ball_pos = pos
+        self.grid[pos] = triplet[2]
+        return True
+
+    def draw_initial_grid(self) -> None:
+        while self.parse_triplet(self.get_next_triplet()):
+            pass
+
+    def print_grid(self) -> None:
+        coords = self.grid.keys()
+        maxRow = max(coords, key=lambda x: x[1])[1]
+        maxCol = max(coords, key=lambda x: x[0])[0]
+        array_grid = np.zeros((maxRow + 1, maxCol + 1), dtype=int)
+        for k in self.grid:
+            array_grid[k[1], k[0]] = self.grid[k]
+        print(array_grid)
 
     def get_nb_blocks(self) -> int:
         block_tiles = 0
         for k in self.grid:
             block_tiles += 1 * (self.grid[k] == 2)
-        print(block_tiles)
+        return block_tiles
+
+    def play_game(self) -> int:
+        while True:
+            try:
+                tilt = self.get_auto_joystick_input()
+                self.cpt.input = tilt
+                while self.parse_triplet(self.get_next_triplet()):
+                    pass
+            except EndOfProgram:
+                break
+        return self.score
 
 
+np.set_printoptions(threshold=10000, linewidth=200)
 arcade = ArcadeCabinet(input_list)
-arcade.get_nb_blocks()
+arcade.draw_initial_grid()
+print(arcade.get_nb_blocks())
+print(arcade.play_game())
