@@ -165,7 +165,7 @@ class Droid:
         directions = Droid.directions_mapping.keys()
         return set([add(self.current_position, d) for d in directions])
 
-    def create_graph_with_dfs(self) -> None:
+    def create_graph_dfs(self) -> None:
         while len(self.to_explore) > 0:
             next_v = self.to_explore[-1]
             direction = substract(next_v, self.current_position)
@@ -189,7 +189,6 @@ class Droid:
                 continue
 
             if result == 2:
-                print("found")
                 self.oxygen_position = next_v
 
             # If we managed to move, we complete the graph by creating
@@ -198,7 +197,6 @@ class Droid:
             self.graph[next_v].append(self.current_position)
             self.previous_positions.append(self.current_position)
             self.current_position = next_v
-
             # Adding the adjacent unexplored vertices to the stack.
             next_vertices_to_explore = self.get_adjacent_vertices() - set(
                 self.graph.keys())
@@ -219,27 +217,45 @@ class Droid:
         grid[-minRow, -minCol] = "D"
         grid[self.oxygen_position[1] - minRow,
              self.oxygen_position[0] - minCol] = "O"
-        print(grid, grid.shape)
+        print(grid)
 
-    def bfs_shortest_path(self) -> int:
-        queue = deque([(0, 0)])
+    # The distance can actually be retrieved directly during the DFS creation
+    # of the graph because there is only one way from the start position to
+    # every other location in our case, but a BFS shortest path algorithm is
+    # more robust in general.
+    def bfs_shortest_dist(self,
+                          origin: Tuple[int, int],
+                          destination: Tuple[int, int] = None) -> int:
+        """
+            If destination is set to None, the algorithm returns the shortest
+            distance to the point that is the furthest away from the origin.
+        """
+        queue = deque([origin])
         visited_vertices = set()
-        counter = 0
-        while True:
+        counter = -1
+
+        while len(queue) > 0:
             counter += 1
-            next_ring = []
+            next_queue = deque()
             while len(queue) > 0:
                 next_v = queue.popleft()
                 visited_vertices.add(next_v)
-                if next_v == self.oxygen_position:
+                if destination != None and next_v == destination:
+                    # early return in the case where a destination was provided
                     return counter
-                next_ring.extend(set(self.graph[next_v]) - visited_vertices)
-            queue.extend(next_ring)
+                next_queue.extend(set(self.graph[next_v]) - visited_vertices)
+            queue = next_queue
+        return counter
 
 
 np.set_printoptions(linewidth=200, threshold=5000)
 droid = Droid(input_list)
 
-droid.create_graph_with_dfs()
+droid.create_graph_dfs()
 droid.print_map()
-print(droid.bfs_shortest_path())
+
+print("Shortest path to the oxygen system : {} steps".format(
+    droid.bfs_shortest_dist((0, 0), droid.oxygen_position)))
+
+print("Time to fill map : {} steps (minutes)".format(
+    droid.bfs_shortest_dist(droid.oxygen_position)))
