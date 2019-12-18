@@ -5,142 +5,114 @@ input_list = list(map(int, input_txt.split(",")))
 
 from typing import List, Tuple, Dict, DefaultDict
 from collections import defaultdict
+from intcode_computer import IntcodeComputer, EndOfProgram
+
+test_ASCII_repr = "#######...#####\n#.....#...#...#\n#.....#...#...#\n......#...#...#\n......#...###.#\n......#.....#.#\n^########...#.#\n......#.#...#.#\n......#########\n........#...#..\n....#########..\n....#...#......\n....#...#......\n....#...#......\n....#####......"
 
 
-def get_digit_right_to_left(number, digit_position):
+def substract(pos1: Tuple[int, int], pos2: Tuple[int, int]):
+    return (pos1[0] - pos2[0], pos1[1] - pos2[1])
+
+
+def find_patterns_in_list(l: List,
+                          min_length=2,
+                          multiple_of=1) -> List[Tuple[List, int]]:
     """
-        Extracts from the input number the digit at the given position 
-        from right to left, starting at 0.
+        Finds repeating patterns of given minimum length in the given list.
+        If multiple_of is provided, it will only return patterns of size a
+        a multiple of the provided value.
     """
-    if digit_position <= 0:
-        return number % 10
+    patterns = []
+    for i in range(min_length, len(l) // 2):
+        if i % multiple_of:
+            continue
+        print(i)
+        for j in range(len(l) - i):
+            pattern_to_search = l[j:j + i]
+            count = 0
+            for k in range(j, len(l) - i):
+                if l[k:k + i] == pattern_to_search:
+                    count += 1
+            if count > 1:
+                patterns.append((pattern_to_search, count))
+    patterns.sort(key=lambda x: len(x) * x[1], reverse=True)
+    return patterns
+
+
+def try_to_fill_with_patterns(l, index, patterns, routine):
+    # We try to fill the rest of the list with the existing patterns.
+    while len(l) - index > 0:
+        found_fitting_pattern = False
+        for p in patterns:
+            # We try the already existing patterns and if one of them matches
+            # the next section of the list, we note that we have found
+            # a fitting pattern.
+            to_try = patterns[p]
+            to_compare = l[index:index + len(to_try)]
+            if to_try == to_compare:
+                found_fitting_pattern = True
+                print(routine)
+                routine.append(p)
+                index += len(to_try)
+                break
+
+        if not found_fitting_pattern:
+            break
+    if index == len(l):
+        return True, index
     else:
-        return get_digit_right_to_left(number // 10, digit_position - 1)
+        return False, index
 
 
-class EndOfProgram(Exception):
-    pass
+def find_routine(l: List, max_characters=20):
+    patterns = {}
 
-
-class IntcodeComputer:
-    def __init__(self, program: List[int]):
-        dict_program = {k: v for k, v in enumerate(program)}
-        # storing the program using a defaultdict for easy auto-expansion
-        self.program = defaultdict(lambda: 0, dict_program)
-        self.pointer = 0
-        self.modes = 0
-        self.relative_base = 0
-        self.halt = False
-        self.input = None
-        self.output = None
-        self.new_output = False
-
-    def param(self, param_nb: int) -> int:
-        """
-            Applies the appropriate mode to the param at self.pointer + param_nb
-            and returns the index in the program at which to look.
-        """
-        mode = get_digit_right_to_left(self.modes, param_nb - 1)
-        param_index = self.pointer + param_nb
-        if mode == 1:
-            # immediate mode
-            return param_index
-        if mode == 2:
-            # relative mode
-            return self.relative_base + self.program[param_index]
+    # We are first trying out all possible values of A, B and C as the
+    # first 3 patterns.
+    for i in range(1, max_characters // 2 + 1):
+        patterns["A"] = l[:i]
+        routine = ["A"]
+        filled, start_first_b = try_to_fill_with_patterns(
+            l, i, patterns, routine)
+        routine_after_A = routine[:]
+        if filled:
+            return routine, patterns
         else:
-            # position mode
-            return self.program[param_index]
+            pass
+        for j in range(1, max_characters // 2 + 1):
+            routine = routine_after_A[:] + ["B"]
+            patterns["B"] = l[start_first_b:start_first_b + j]
+            filled, start_first_c = try_to_fill_with_patterns(
+                l, start_first_b + j, patterns, routine)
+            routine_after_B = routine[:]
+            if filled:
+                return routine, patterns
+            else:
+                pass
+            for k in range(1, max_characters // 2 + 1):
+                routine = routine_after_B[:] + ["C"]
+                patterns["C"] = l[start_first_c:start_first_c + k]
+                index = start_first_c + k
 
-    def op_sum(self) -> None:
-        self.program[self.param(
-            3)] = self.program[self.param(1)] + self.program[self.param(2)]
-        self.pointer += 4
-
-    def op_multiply(self) -> None:
-        self.program[self.param(
-            3)] = self.program[self.param(1)] * self.program[self.param(2)]
-        self.pointer += 4
-
-    def op_input(self) -> None:
-        self.program[self.param(1)] = self.input
-        self.pointer += 2
-
-    def op_output(self) -> None:
-        self.output = self.program[self.param(1)]
-        self.new_output = True
-        self.pointer += 2
-
-    def op_jump_if_true(self) -> None:
-        self.pointer = self.program[self.param(2)] if (
-            self.program[self.param(1)] != 0) else self.pointer + 3
-
-    def op_jump_if_false(self) -> None:
-        self.pointer = self.program[self.param(2)] if (
-            self.program[self.param(1)] == 0) else self.pointer + 3
-
-    def op_less_than(self) -> None:
-        self.program[self.param(3)] = 1 if (
-            self.program[self.param(1)] < self.program[self.param(2)]) else 0
-        self.pointer += 4
-
-    def op_equal_to(self) -> None:
-        self.program[self.param(3)] = 1 if (
-            self.program[self.param(1)] == self.program[self.param(2)]) else 0
-        self.pointer += 4
-
-    def op_adjust_relative(self) -> None:
-        self.relative_base += self.program[self.param(1)]
-        self.pointer += 2
-
-    def parse_next_instruction(self) -> None:
-        """
-            Parses an instruction, executes it with the correct mode and returns
-            the index of the next instruction or -1 if terminated.
-        """
-        instruction = self.program[self.pointer]
-        opcode = instruction % 100
-        if opcode == 99:
-            self.halt = True
-
-        self.modes = instruction // 100
-
-        if opcode == 1:
-            self.op_sum()
-        if opcode == 2:
-            self.op_multiply()
-        if opcode == 3:
-            self.op_input()
-        if opcode == 4:
-            self.op_output()
-        if opcode == 5:
-            self.op_jump_if_true()
-        if opcode == 6:
-            self.op_jump_if_false()
-        if opcode == 7:
-            self.op_less_than()
-        if opcode == 8:
-            self.op_equal_to()
-        if opcode == 9:
-            self.op_adjust_relative()
-
-    def run_all(self) -> None:
-        while not self.halt:
-            self.parse_next_instruction()
-        return self.output
-
-    def run_to_next_output(self) -> int:
-        while not (self.halt or self.new_output):
-            self.parse_next_instruction()
-        if self.halt:
-            raise EndOfProgram()
-        self.new_output = False
-        return self.output
+                if try_to_fill_with_patterns(l, index, patterns, routine)[0]:
+                    return routine, patterns
 
 
-test_ASCII_repr = "..#..........\n..#..........\n#######...###\n#.#...#...#.#\n#############\n..#...#...#..\n..#####...^.."
+test_list = [
+    "R", 8, "R", 8, "R", 4, "R", 4, "R", 8, "L", 6, "L", 2, "R", 4, "R", 4, "R",
+    8, "R", 8, "R", 8, "L", 6, "L", 2
+]
+test_list2 = [
+    'L', 12, 'L', 6, 'L', 8, 'R', 6, 'L', 8, 'L', 8, 'R', 4, 'R', 6, 'R', 6,
+    'L', 12, 'L', 6, 'L', 8, 'R', 6, 'L', 8, 'L', 8, 'R', 4, 'R', 6, 'R', 6,
+    'L', 12, 'R', 6, 'L', 8, 'L', 12, 'R', 6, 'L', 8, 'L', 8, 'L', 8, 'R', 4,
+    'R', 6, 'R', 6, 'L', 12, 'L', 6, 'L', 8, 'R', 6, 'L', 8, 'L', 8, 'R', 4,
+    'R', 6, 'R', 6, 'L', 12, 'R', 6, 'L', 8
+]
 
-
+test_list3 = [1, 2, 4, 5, 1, 2, 9, 8, 1, 2]
+print(find_routine(test_list2, 20))
+"""
 class ASCIIparser:
     @staticmethod
     def parse_to_ASCII(intcode: List[int]) -> str:
@@ -156,36 +128,96 @@ class ASCIIparser:
     @staticmethod
     def ASCII_to_map(
         ASCII_rep: str
-    ) -> Tuple[Dict[Tuple[int, int], str], Tuple[int, int]]:
+    ) -> Tuple[Dict[Tuple[int, int], str], Tuple[int, int], Tuple[int, int]]:
         map_repr = {}
         lines = ASCII_rep.split("\n")
         shape = (len(lines), len(lines[0]))
+        robot_pos = None
         for i, l in enumerate(lines):
             for j, c in enumerate(l):
                 if c in "#^v><":
                     map_repr[i, j] = c
-        return map_repr, shape
+                    if c != "#":
+                        robot_pos = (i, j)
+        return map_repr, shape, robot_pos
+
+    @staticmethod
+    def get_adjacent_pos(pos: Tuple[int, int]) -> List[Tuple[int, int]]:
+        row, col = pos
+        return [(row + 1, col), (row - 1, col), (row, col + 1), (row, col - 1)]
 
     def __init__(self, program: List[int]):
         self.ASCII_repr = ASCIIparser.parse_to_ASCII(program[:])
-        self.map_repr, self.shape = ASCIIparser.ASCII_to_map(self.ASCII_repr)
+        #self.ASCII_repr = test_ASCII_repr
+        self.map_repr, self.shape, self.robot_pos = ASCIIparser.ASCII_to_map(
+            self.ASCII_repr)
 
     def find_scaffold_intersections(self) -> List[Tuple[int, int]]:
         intersections = []
-        for row, col in self.map_repr:
+        for pos in self.map_repr:
             try:
-                self.map_repr[row + 1, col]
-                self.map_repr[row - 1, col]
-                self.map_repr[row, col + 1]
-                self.map_repr[row, col - 1]
-                intersections.append((row, col))
+                for p in ASCIIparser.get_adjacent_pos(pos):
+                    self.map_repr[p]
+                intersections.append(pos)
             except KeyError:
                 continue
         return intersections
+
+    def path_to_visit_scaffold(self) -> List[str]:
+        robot_orientations = {
+            "^": (-1, 0),
+            "v": (1, 0),
+            ">": (0, 1),
+            "<": (0, -1)
+        }
+        last_direction = robot_orientations[self.map_repr[self.robot_pos]]
+        visited_positions = [None]
+        commands = []
+
+        while True:
+            possible_next_positions = []
+            # Find what adjacent nodes are part of the scaffold
+            for p in ASCIIparser.get_adjacent_pos(self.robot_pos):
+                try:
+                    self.map_repr[p]
+                    if p != visited_positions[-1]:
+                        possible_next_positions.append(p)
+                except KeyError:
+                    continue
+            if len(possible_next_positions) == 0:
+                # This means we have reached the end of the scaffold
+                break
+
+            elif len(possible_next_positions) == 3:
+                # If several options (when the robot is at an intersection),
+                # prefer going forward.
+                for p in possible_next_positions:
+                    if substract(p, self.robot_pos) == last_direction:
+                        next_pos = p
+                        break
+            else:
+                # Necessarily only 1 possible next position
+                next_pos = possible_next_positions[0]
+
+            direction = substract(next_pos, self.robot_pos)
+
+            if direction == last_direction:
+                commands[-1] += 1
+            elif (last_direction[1], -last_direction[0]) == direction:
+                commands.extend(["R", 1])
+            else:
+                commands.extend(["L", 1])
+
+            last_direction = direction
+            visited_positions.append(self.robot_pos)
+            self.robot_pos = next_pos
+        print(len(commands))
+        return commands
 
 
 parser = ASCIIparser(input_list)
 print(parser.ASCII_repr)
 intersections = parser.find_scaffold_intersections()
 sum_align_params = sum([row * col for row, col in intersections])
-print(sum_align_params)
+
+print(parser.path_to_visit_scaffold())"""
