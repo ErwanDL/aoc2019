@@ -18,7 +18,9 @@ class EndOfProgram(Exception):
 
 
 class IntcodeComputer:
-    def __init__(self, program: List[int]):
+    def __init__(self,
+                 program: List[int],
+                 input_movement_rules: List[int] = None):
         dict_program = {k: v for k, v in enumerate(program)}
         # storing the program using a defaultdict for easy auto-expansion
         self.program = defaultdict(lambda: 0, dict_program)
@@ -26,7 +28,10 @@ class IntcodeComputer:
         self.modes = 0
         self.relative_base = 0
         self.halt = False
-        self.input = None
+        if input_movement_rules != None:
+            self.input = input_movement_rules[:]
+        else:
+            self.input = None
         self.output = None
         self.new_output = False
 
@@ -58,11 +63,15 @@ class IntcodeComputer:
         self.pointer += 4
 
     def op_input(self) -> None:
-        self.program[self.param(1)] = self.input
+        value = self.input.pop(0)
+        if len(self.input) == 0:
+            print("parsed last input")
+        self.program[self.param(1)] = value
         self.pointer += 2
 
     def op_output(self) -> None:
         self.output = self.program[self.param(1)]
+        print(self.output)
         self.new_output = True
         self.pointer += 2
 
