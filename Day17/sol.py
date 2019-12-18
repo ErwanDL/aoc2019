@@ -3,7 +3,7 @@ dirname = os.path.dirname(__file__)
 input_txt = open(dirname + "/input.txt", "r").read()
 input_list = list(map(int, input_txt.split(",")))
 
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, DefaultDict
 from collections import defaultdict
 
 
@@ -138,12 +138,54 @@ class IntcodeComputer:
         return self.output
 
 
-cpt = IntcodeComputer(input_list)
-res = ""
-while True:
-    try:
-        res += chr(cpt.run_to_next_output())
-    except EndOfProgram:
-        break
+test_ASCII_repr = "..#..........\n..#..........\n#######...###\n#.#...#...#.#\n#############\n..#...#...#..\n..#####...^.."
 
-print(res)
+
+class ASCIIparser:
+    @staticmethod
+    def parse_to_ASCII(intcode: List[int]) -> str:
+        cpt = IntcodeComputer(intcode)
+        res = ""
+        while True:
+            try:
+                res += chr(cpt.run_to_next_output())
+            except EndOfProgram:
+                break
+        return res
+
+    @staticmethod
+    def ASCII_to_map(
+        ASCII_rep: str
+    ) -> Tuple[Dict[Tuple[int, int], str], Tuple[int, int]]:
+        map_repr = {}
+        lines = ASCII_rep.split("\n")
+        shape = (len(lines), len(lines[0]))
+        for i, l in enumerate(lines):
+            for j, c in enumerate(l):
+                if c in "#^v><":
+                    map_repr[i, j] = c
+        return map_repr, shape
+
+    def __init__(self, program: List[int]):
+        self.ASCII_repr = ASCIIparser.parse_to_ASCII(program[:])
+        self.map_repr, self.shape = ASCIIparser.ASCII_to_map(self.ASCII_repr)
+
+    def find_scaffold_intersections(self) -> List[Tuple[int, int]]:
+        intersections = []
+        for row, col in self.map_repr:
+            try:
+                self.map_repr[row + 1, col]
+                self.map_repr[row - 1, col]
+                self.map_repr[row, col + 1]
+                self.map_repr[row, col - 1]
+                intersections.append((row, col))
+            except KeyError:
+                continue
+        return intersections
+
+
+parser = ASCIIparser(input_list)
+print(parser.ASCII_repr)
+intersections = parser.find_scaffold_intersections()
+sum_align_params = sum([row * col for row, col in intersections])
+print(sum_align_params)
