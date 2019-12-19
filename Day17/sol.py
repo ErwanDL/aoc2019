@@ -204,16 +204,11 @@ class ASCIIparser:
 
         def list_as_ASCII(l):
             output = []
-            for element in l[:-1]:
-                if type(element) == int:
-                    output.append(element)
-                else:
-                    output.append(ord(element))
+            for element in l:
+                for char in str(element):
+                    output.append(ord(char))
                 output.append(44)
-            if type(l[-1]) == int:
-                output.append(l[-1])
-            else:
-                output.append(ord(l[-1]))
+            output.pop()
             output.append(10)
             return output
 
@@ -222,6 +217,7 @@ class ASCIIparser:
             movement_rules.extend(list_as_ASCII(patterns[p]))
         movement_rules.append(ord("n"))
         movement_rules.append(10)
+        print(movement_rules)
         cpt = IntcodeComputer(self.program, movement_rules)
         res = cpt.run_all()
         return res

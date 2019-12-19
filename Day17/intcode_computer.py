@@ -64,16 +64,15 @@ class IntcodeComputer:
 
     def op_input(self) -> None:
         value = self.input.pop(0)
-        if len(self.input) == 0:
-            print("parsed last input")
+        print("Input : {}".format(value))
         self.program[self.param(1)] = value
         self.pointer += 2
 
     def op_output(self) -> None:
         self.output = self.program[self.param(1)]
-        print(self.output)
         self.new_output = True
         self.pointer += 2
+        print("Output : {}".format(self.output))
 
     def op_jump_if_true(self) -> None:
         self.pointer = self.program[self.param(2)] if (
