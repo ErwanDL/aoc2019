@@ -217,7 +217,6 @@ class ASCIIparser:
             movement_rules.extend(list_as_ASCII(patterns[p]))
         movement_rules.append(ord("n"))
         movement_rules.append(10)
-        print(movement_rules)
         cpt = IntcodeComputer(self.program, movement_rules)
         res = cpt.run_all()
         return res
@@ -229,5 +228,6 @@ intersections = parser.find_scaffold_intersections()
 sum_align_params = sum([row * col for row, col in intersections])
 print("Sum of alignment parameters : {}".format(sum_align_params))
 
-print(parser.path_to_visit_scaffold())
+print("Commands in order to visit the whole scaffold : {}".format(
+    parser.path_to_visit_scaffold()))
 print("Res : {}".format(parser.wake_robot_and_collect_dust()))

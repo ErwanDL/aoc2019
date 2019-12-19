@@ -64,7 +64,6 @@ class IntcodeComputer:
 
     def op_input(self) -> None:
         value = self.input.pop(0)
-        print("Input : {}".format(value))
         self.program[self.param(1)] = value
         self.pointer += 2
 
@@ -72,7 +71,6 @@ class IntcodeComputer:
         self.output = self.program[self.param(1)]
         self.new_output = True
         self.pointer += 2
-        print("Output : {}".format(self.output))
 
     def op_jump_if_true(self) -> None:
         self.pointer = self.program[self.param(2)] if (
