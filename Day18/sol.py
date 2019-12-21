@@ -1,11 +1,12 @@
 import os
 dirname = os.path.dirname(__file__)
-input_txt = open(dirname + "/test2.txt", "r").read()
+input_txt = open(dirname + "/input.txt", "r").read()
 input_list = input_txt.split("\n")
 from typing import Dict, Tuple, List, Set
 import numpy as np
 import math
 import itertools
+from collections import defaultdict
 
 
 # TUPLE ARITHMETICS FUNCTIONS
@@ -74,7 +75,7 @@ class Labyrinth:
                         self.doors[val] = (i, j)
                 self.grid[i, j] = val
         self.graph = {'@': {}}
-        """ self.graph = {
+        self.graph = {
             "@": {
                 '(39, 40)': (1, []),
                 '(41, 40)': (1, []),
@@ -93,7 +94,7 @@ class Labyrinth:
             "(40, 41)": {
                 "@": (1, [])
             }
-        } """
+        }
 
     def create_graph_dfs(self, current_pos: Tuple[int, int],
                          searched_vertices: Set[Tuple[int, int]],
@@ -134,34 +135,6 @@ class Labyrinth:
             self.create_graph_dfs(v, searched_vertices, previous_v,
                                   steps_since_previous_v,
                                   doors_since_previous_v)
-
-    def graph_without_intersections(self) -> Dict[str, List]:
-        graph_wo = {}
-
-        def get_key_neighbors_dfs(k, length_so_far: int, neighbors_dists: Dict,
-                                  visited_neighbors: Set):
-            """
-                Retrieves the direct neighbor KEYS (not intersections) of a 
-                certain Key, and the distance to this initial Key.
-            """
-            for neighbor, (dist, _) in self.graph[k].items():
-                if neighbor in visited_neighbors:
-                    continue
-                else:
-                    visited_neighbors.add(neighbor)
-                    if neighbor.isalpha() or neighbor == '@':
-                        neighbors_dists[neighbor] = length_so_far + dist
-                    else:
-                        get_key_neighbors_dfs(neighbor, length_so_far + dist,
-                                              neighbors_dists,
-                                              visited_neighbors)
-
-        for k in self.graph:
-            if k.isalpha() or k == '@':
-                graph_wo[k] = {}
-                get_key_neighbors_dfs(k, 0, graph_wo[k], set([k]))
-        self.simplified_graph = graph_wo
-        return graph_wo
 
     def keys_prerequisites(self) -> Dict[str, List[str]]:
         def find_prereq_doors(current_key: str, doors_so_far: List[str],
@@ -238,27 +211,46 @@ class Labyrinth:
             return next_min, best_path
 
     def tsp_dynamic(self):
-        # C will hold at key (i, {a, b, c...}) the shortest path from start
-        # to vertex i that passes by all the vertices {a, b, c...}
-        C = {}
+        # C will hold at key ({a, b, c...}, i) the shortest path from
+        # vertex i that passes by all the vertices {a, b, c...}
+        C = defaultdict(lambda: (math.inf, []))
         keys_wo_start = set(self.keys) - {'@'}
         for i in keys_wo_start:
-            C[frozenset({i}), i] = self.shortest_paths['@'][i]
+            C[frozenset({i}), i] = (0, [])
         for s in range(2, len(self.keys)):
+            print(s)
             size_s_sets = list(itertools.combinations(keys_wo_start, s))
             for s_set in size_s_sets:
-                for k in keys_wo_start:
-                    subproblems = [
-                        C[frozenset(s_set - {k}, m)] + self.shortest_paths[m][k]
-                        for m in keys_wo_start if m != k
-                    ]
-                    C[frozenset(s_set), k] = min()
-        return
+                for k in s_set:
+                    sub_solutions = []
+                    for m in keys_wo_start:
+                        to_visit = frozenset(set(s_set) - {k})
+                        # taking m != k and ensuring no key coming after m in
+                        # the path is a prerequisite for m
+                        if m != k and len(
+                                to_visit.intersection(
+                                    self.prereq_keys[k])) == 0:
+                            sub_solutions.append(
+                                add(C[to_visit, m],
+                                    (self.shortest_paths[m][k]["dist"], [m])))
+                    try:
+                        C[frozenset(s_set), k] = min(sub_solutions,
+                                                     key=lambda x: x[0])
+                    except ValueError:
+                        # if sub_solutions is an empty list
+                        C[frozenset(s_set), k] = (math.inf, [])
+        steps, path = min([
+            add(C[frozenset(keys_wo_start), k],
+                (self.shortest_paths[k]["@"]["dist"], ["@"]))
+            for k in keys_wo_start
+        ],
+                          key=lambda x: x[0])
+        path.reverse()
+        return steps, path
 
 
 laby = Labyrinth(input_list)
 laby.create_graph_dfs(laby.start_pos, set(laby.graph.keys()), None, 0, [])
 laby.compute_shortest_paths()
 laby.keys_prerequisites()
-print(laby.graph)
-print(laby.tsp_brute_force("@", ['@']))
+print(laby.tsp_dynamic())
