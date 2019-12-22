@@ -1,6 +1,6 @@
 import os
 dirname = os.path.dirname(__file__)
-input_txt = open(dirname + "/input.txt", "r").read()
+input_txt = open(dirname + "/test2.txt", "r").read()
 input_list = input_txt.split("\n")
 from typing import Dict, Tuple, List, Set
 import numpy as np
@@ -211,34 +211,27 @@ class Labyrinth:
             return next_min, best_path
 
     def tsp_dynamic(self):
-        # C will hold at key ({a, b, c...}, i) the shortest path from
+        # C will hold at key ({a, b, c...}, i) the shortest path ending at
         # vertex i that passes by all the vertices {a, b, c...}
         C = defaultdict(lambda: (math.inf, []))
         keys_wo_start = set(self.keys) - {'@'}
         for i in keys_wo_start:
-            C[frozenset({i}), i] = (0, [])
+            C[frozenset({i}), i] = (0, [i])
         for s in range(2, len(self.keys)):
             print(s)
             size_s_sets = list(itertools.combinations(keys_wo_start, s))
             for s_set in size_s_sets:
                 for k in s_set:
+                    to_visit = frozenset(set(s_set) - {k})
                     sub_solutions = []
-                    for m in keys_wo_start:
-                        to_visit = frozenset(set(s_set) - {k})
-                        # taking m != k and ensuring no key coming after m in
-                        # the path is a prerequisite for m
-                        if m != k and len(
-                                to_visit.intersection(
-                                    self.prereq_keys[k])) == 0:
+                    # ensuring no key coming after k is a prerequisite for k
+                    if len(to_visit.intersection(self.prereq_keys[k])) == 0:
+                        for m in keys_wo_start - {k}:
                             sub_solutions.append(
                                 add(C[to_visit, m],
-                                    (self.shortest_paths[m][k]["dist"], [m])))
-                    try:
+                                    (self.shortest_paths[m][k]["dist"], [k])))
                         C[frozenset(s_set), k] = min(sub_solutions,
                                                      key=lambda x: x[0])
-                    except ValueError:
-                        # if sub_solutions is an empty list
-                        C[frozenset(s_set), k] = (math.inf, [])
         steps, path = min([
             add(C[frozenset(keys_wo_start), k],
                 (self.shortest_paths[k]["@"]["dist"], ["@"]))
@@ -252,5 +245,5 @@ class Labyrinth:
 laby = Labyrinth(input_list)
 laby.create_graph_dfs(laby.start_pos, set(laby.graph.keys()), None, 0, [])
 laby.compute_shortest_paths()
-laby.keys_prerequisites()
+print(laby.keys_prerequisites())
 print(laby.tsp_dynamic())
